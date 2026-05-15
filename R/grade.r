@@ -482,21 +482,35 @@ getTestScriptReport <- function(script_path) {
   
   # Helper function to recursively find expect_ calls
   find_expect_calls <- function(expr) {
+    
+    # Handle missing / NULL / empty inputs
+    if (missing(expr) || is.null(expr) || length(expr) == 0) {
+      return(list())
+    }
+    
     expect_calls <- list()
     
     if (is.call(expr)) {
-      func_name <- as.character(expr[[1]])
+      #Safer function name extraction
+      func_name <- tryCatch({
+        as.character(expr[[1]])[1]
+      }, error = function(e) NA_character_)
       
       # Check if this is an expect_ function
-      if (grepl("^expect_", func_name)) {
+      if (!is.na(func_name) && grepl("^expect_", func_name)) {
         # Extract label argument if present
         args <- as.list(expr)
         label_arg <- NULL
         points <- 1
         
-        if ("label" %in% names(args)) {
+        # Safely handle named arguments
+        if ("label" %in% names(args) && !is.null(args$label)) {
           label_arg <- args$label
-          points <- extract_points(label_arg)
+          
+          # Guard extract_points too
+          points <- tryCatch({
+            extract_points(label_arg)
+          }, error = function(e) 1)
         }
         
         expect_calls[[length(expect_calls) + 1]] <- list(
@@ -509,7 +523,20 @@ getTestScriptReport <- function(script_path) {
       # Recursively search in all arguments (only if there are arguments)
       if (length(expr) > 1) {
         args_list <- as.list(expr[-1])
-        for (arg in args_list) {
+        
+        for (i in seq_along(args_list)) {
+          arg <- args_list[[i]]
+          
+          # skip missing arguments
+          if (is.symbol(substitute(arg)) && identical(deparse(substitute(arg)), "")) {
+            next
+          }
+          
+          # skip NULL / empty
+          if (is.null(arg) || length(arg) == 0) {
+            next
+          }
+          
           expect_calls <- c(expect_calls, find_expect_calls(arg))
         }
       }
