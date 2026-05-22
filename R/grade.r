@@ -209,9 +209,13 @@ processTestAssertions <- function(assertion_results){
       test_score <- test_score + criterion_pts
       criterion_messages <- c(criterion_messages, 
                               paste0("+", criterion_pts, " (test passed): ", custom_msg))
-    }else if(methods::is(assertion, "expectation_failure")){
+    }else if(methods::is(assertion, "expectation_failure") || methods::is(assertion, "expectation_error")){
       criterion_messages <- c(criterion_messages, 
                               paste0("+0 (*****test failed*****): ", custom_msg))
+    }else{
+      # catch anything unexpected
+      criterion_messages <- c(criterion_messages, 
+                              paste0("+0 (unknown issue): ", custom_msg))
     }
   }
   
