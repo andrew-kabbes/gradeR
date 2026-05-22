@@ -345,7 +345,6 @@ calcGrades <- function(submission_dir, your_test_file, suppress_warnings = TRUE,
           invokeRestart("muffleError")
         }
       )
-      ``
       
       # Parse the output and store scores
       scores <- parseTestResults(lr, number_questions)
