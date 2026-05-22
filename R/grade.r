@@ -81,6 +81,45 @@ runStudentScript <- function(script_path, suppress_warnings = TRUE){
 }
 
 
+#' Safely wrap testthat expectation functions
+#'
+#' Creates a safe version of an expect_* function that catches evaluation
+#' errors (e.g., missing objects) and converts them into test failures.
+#'
+#' @param fun the original testthat expectation function
+#' @return a wrapped function
+make_safe_expect <- function(fun){
+  function(..., label = NULL){
+    
+    # Capture all arguments unevaluated
+    args <- as.list(substitute(list(...)))[-1]
+    parent_env <- parent.frame()
+    
+    tryCatch({
+      # Evaluate arguments manually in the correct environment
+      eval_args <- lapply(args, function(arg){
+        eval(arg, envir = parent_env)
+      })
+      
+      # Call original function with evaluated arguments
+      do.call(fun, c(eval_args, list(label = label)))
+      
+    }, error = function(e){
+      
+      # Build fallback message
+      msg <- if(!is.null(label)) {
+        label
+      } else {
+        paste(sapply(args, function(x) paste(deparse(x), collapse = "")), collapse = ", ")
+      }
+      
+      # Record failure instead of crashing
+      testthat::fail(msg)
+    })
+  }
+}
+
+
 #' Parse test results for a single student.
 #'
 #' Internal helper function that evaluates test results and returns scores.
@@ -330,6 +369,13 @@ calcGrades <- function(submission_dir, your_test_file, suppress_warnings = TRUE,
       )
       on.exit(options(local_options), add = TRUE)
       
+      expect_funs <- ls("package:testthat", pattern = "^expect_")
+      
+      for(fn_name in expect_funs){
+        original_fun <- get(fn_name, envir = asNamespace("testthat"))
+        scriptResults[[fn_name]] <- make_safe_expect(original_fun)
+      }
+      
       lr <- testthat::ListReporter$new()
       out <- testthat::test_file(your_test_file, 
                                  reporter = lr,
@@ -432,6 +478,13 @@ calcGradesForGradescope <- function(submission_file,
     testthat.stop_on_error = FALSE
   )
   on.exit(options(local_options), add = TRUE)
+  
+  expect_funs <- ls("package:testthat", pattern = "^expect_")
+  
+  for(fn_name in expect_funs){
+    original_fun <- get(fn_name, envir = asNamespace("testthat"))
+    scriptResults[[fn_name]] <- make_safe_expect(original_fun)
+  }
   
   lr <- testthat::ListReporter$new()
   out <- testthat::test_file(test_file, 
