@@ -313,6 +313,13 @@ calcGrades <- function(submission_dir, your_test_file, suppress_warnings = TRUE,
     score_data[student_num, 1] <- tmp_full_path
     
     if(!is.null(scriptResults)){
+      
+      local_options <- options(
+        testthat.stop_on_failure = FALSE,
+        testthat.stop_on_error = FALSE
+      )
+      on.exit(options(local_options), add = TRUE)
+      
       lr <- testthat::ListReporter$new()
       out <- testthat::test_file(your_test_file, 
                                  reporter = lr,
@@ -409,6 +416,12 @@ calcGradesForGradescope <- function(submission_file,
     # Don't write output - let Gradescope handle the failure
     return(invisible(NULL))
   }
+  
+  local_options <- options(
+    testthat.stop_on_failure = FALSE,
+    testthat.stop_on_error = FALSE
+  )
+  on.exit(options(local_options), add = TRUE)
   
   lr <- testthat::ListReporter$new()
   out <- testthat::test_file(test_file, 
