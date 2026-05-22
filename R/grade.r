@@ -80,6 +80,39 @@ runStudentScript <- function(script_path, suppress_warnings = TRUE){
   return(scriptResults)
 }
 
+#' Wrap testthat expectation functions to prevent errors from aborting execution
+#'
+#' Internal helper that overrides expect_* functions so that errors are converted
+#' into testthat failures instead of stopping execution.
+#'
+#' @param env the environment where student code and tests are evaluated
+#' @keywords internal
+wrap_expectations <- function(env) {
+  expect_funs <- ls("package:testthat", pattern = "^expect_")
+  
+  for (fname in expect_funs) {
+    
+    assign(
+      fname,
+      local({
+        fn_name <- fname
+        
+        function(...) {
+          tryCatch(
+            {
+              # call original expect_* in proper namespace
+              do.call(getFromNamespace(fn_name, "testthat"), list(...))
+            },
+            error = function(e) {
+              testthat::fail(paste0(fn_name, " ERROR: ", conditionMessage(e)))
+            }
+          )
+        }
+      }),
+      envir = env
+    )
+  }
+}
 
 #' Parse test results for a single student.
 #'
@@ -332,18 +365,19 @@ calcGrades <- function(submission_dir, your_test_file, suppress_warnings = TRUE,
       
       lr <- testthat::ListReporter$new()
       
-      withCallingHandlers(
-        testthat::test_file(your_test_file,
-                            reporter = lr,
-                            env = scriptResults),
-        
-        error = function(e){
-          # Convert error into a testthat failure
-          testthat::fail(conditionMessage(e))
-          
-          # Prevent the error from stopping execution
-          invokeRestart("muffleError")
-        }
+      wrap_expectations(scriptResults)
+      
+      local_options <- options(
+        testthat.stop_on_failure = FALSE,
+        testthat.stop_on_error = FALSE,
+        testthat.catch_exceptions = TRUE
+      )
+      on.exit(options(local_options), add = TRUE)
+      
+      testthat::test_file(
+        your_test_file,
+        reporter = lr,
+        env = scriptResults
       )
       
       # Parse the output and store scores
@@ -446,15 +480,19 @@ calcGradesForGradescope <- function(submission_file,
   
   lr <- testthat::ListReporter$new()
   
-  withCallingHandlers(
-    testthat::test_file(test_file,
-                        reporter = lr,
-                        env = scriptResults),
-    
-    error = function(e){
-      testthat::fail(conditionMessage(e))
-      invokeRestart("muffleError")
-    }
+  wrap_expectations(scriptResults)
+  
+  local_options <- options(
+    testthat.stop_on_failure = FALSE,
+    testthat.stop_on_error = FALSE,
+    testthat.catch_exceptions = TRUE
+  )
+  on.exit(options(local_options), add = TRUE)
+  
+  testthat::test_file(
+    test_file,
+    reporter = lr,
+    env = scriptResults
   )
   
   tests <- list()
