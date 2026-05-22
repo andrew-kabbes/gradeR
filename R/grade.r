@@ -94,6 +94,12 @@ parseTestResults <- function(test_results, number_questions){
   
   for(q in seq_len(number_questions)){
     assertionResults <- test_results$results$as_list()[[q]]$results
+    
+    if(is.null(assertionResults) || length(assertionResults) == 0){
+      scores[q] <- 0
+      next
+    }
+    
     success <- all(sapply(assertionResults, 
                           methods::is, 
                           "expectation_success")) 
