@@ -91,30 +91,26 @@ runStudentScript <- function(script_path, suppress_warnings = TRUE){
 make_safe_expect <- function(fun){
   function(..., label = NULL){
     
-    # Capture all arguments unevaluated
-    args <- as.list(substitute(list(...)))[-1]
-    parent_env <- parent.frame()
+    # Capture the full call (unevaluated)
+    call <- match.call()
     
     tryCatch({
-      # Evaluate arguments manually in the correct environment
-      eval_args <- lapply(args, function(arg){
-        eval(arg, envir = parent_env)
-      })
-      
-      # Call original function with evaluated arguments
-      do.call(fun, c(eval_args, list(label = label)))
+      # Reconstruct and evaluate the original expectation call
+      eval.parent(call)
       
     }, error = function(e){
       
-      # Build fallback message
-      msg <- if(!is.null(label)) {
+      # Extract label if available
+      msg <- if(!is.null(label)){
         label
       } else {
-        paste(sapply(args, function(x) paste(deparse(x), collapse = "")), collapse = ", ")
+        paste(deparse(call[[2]]), collapse = " ")
       }
       
-      # Record failure instead of crashing
-      testthat::fail(msg)
+      # Include error message
+      full_msg <- paste0(msg, " - ", conditionMessage(e))
+      
+      testthat::fail(full_msg)
     })
   }
 }
